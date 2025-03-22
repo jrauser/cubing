@@ -26,7 +26,9 @@ comp_quantiles %>%
   group_by(month) %>%
   summarize(min_ao5 = min(ao5_p0/100)) %>%
   ggplot(aes(month, min_ao5)) +
-  geom_point() + geom_smooth()
+  geom_point() + geom_smooth() + 
+  ggtitle("Fastest recorded 3x3 ao5 by month at a WCA event") +
+  xlab(NULL) + ylab("Fastest recorded 3x3 ao5 (s)")
 
 
 comp_quantiles %>%

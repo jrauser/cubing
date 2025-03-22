@@ -31,13 +31,14 @@ session_data <- fromJSON(properties$sessionData, simplifyDataFrame = T)
 ```
 
 ```{r aon_funcion}
-aon <- function(t, n) {
+aon <- function(t, n, trim=1) {
   stopifnot(length(t)==n)
   t<-sort(t)
-  end<-n-1
-  return(mean(t[2:end]))
+  end<-n-trim
+  start<-1+trim
+  return(mean(t[start:end]))
 }
-#aon(c(20,35,40,10,100), 5) == mean(c(20,35,40))
+aon(c(20,35,40,10,100), 5) == mean(c(20,35,40))
 ```
 
 ```{r sessionize}
@@ -64,11 +65,22 @@ dat <- tibble(sessionid=names(json), solves_json=json, nsolves=map_int(solves_js
   mutate(solves_tbl = map(solves_json, do_session)) %>%
   select(-solves_json, -nsolves) %>%
   unnest(solves_tbl) %>%
-  mutate(ao100 = slide_dbl(time, aon, n=100, .before=99, .complete=T))
+  mutate(ao100 = slide_dbl(time, aon, n=100, trim=5, .before=99, .complete=T))
 
 minors <- seq(floor(min(dat$time, na.rm=T)), ceiling(max(dat$time, na.rm=T)))
 majors <- seq(floor(min(dat$time, na.rm=T)/5)*5, ceiling(max(dat$time, na.rm=T)/5)*5, by=5)
 ```
+
+
+```{r all_solves1, eval=F}
+dat %>%
+  ggplot(aes(timestamp, time)) +
+  geom_point() +
+  geom_smooth(method="loess") + 
+  scale_y_continuous(minor_breaks=minors, breaks=majors) +
+  ggtitle("All Solves")
+```
+
 
 ```{r all_solves}
 dat %>%
@@ -79,6 +91,26 @@ dat %>%
   geom_smooth(method="loess") + 
   scale_y_continuous(minor_breaks=minors, breaks=majors) +
   ggtitle("All Solves (>60s trimmed)")
+```
+
+
+```{r solve_hist, eval=F}
+dat %>% 
+  arrange(timestamp) %>%
+  tail(100) %>%
+  ggplot(aes(time)) +
+  geom_histogram(binwidth=1)
+#  geom_density()
+```
+
+```{r solve_dist}
+dat %>% 
+  arrange(timestamp) %>%
+  tail(200) %>%
+  mutate(grp=c(rep("previous 100 solves", 100), 
+               rep("last 100 solves", 100))) %>%
+  ggplot(aes(time, group=grp, fill=grp)) +
+  geom_density(alpha=1/2)
 ```
 
 ```{r all_ao5}
@@ -115,7 +147,7 @@ dat %>%
 dat %>%
   filter(timestamp > "2022-01-01", !is.na(ao5)) %>%
   group_by(sessionid) %>%
-  mutate(rank = rank(ao5)) %>%
+  mutate(rank = rank(ao5, ties.method = "random")) %>%
   filter(rank==1) %>%
   ggplot(aes(timestamp, ao5)) +
   geom_point() +
@@ -128,7 +160,7 @@ dat %>%
 dat %>%
   filter(timestamp > "2022-01-01", !is.na(ao12)) %>%
   group_by(sessionid) %>%
-  mutate(rank = rank(ao12)) %>%
+  mutate(rank = rank(ao12, ties.method = "random")) %>%
   filter(rank==1) %>%
   ggplot(aes(timestamp, ao12)) +
   geom_point() +
